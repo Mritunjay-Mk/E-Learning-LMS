@@ -41,12 +41,12 @@ export const assertProductionEnv = () => {
   const required = [
     ['MONGO_URI', env.mongoUri],
     ['JWT_SECRET', env.jwtSecret],
-    ['RAZORPAY_KEY_ID', env.razorpayKeyId],
-    ['RAZORPAY_KEY_SECRET', env.razorpayKeySecret],
+    // ['RAZORPAY_KEY_ID', env.razorpayKeyId],
+    // ['RAZORPAY_KEY_SECRET', env.razorpayKeySecret],
     ['GEMINI_API_KEY', env.geminiApiKey],
-    ['CLOUDINARY_CLOUD_NAME', env.cloudinaryCloudName],
-    ['CLOUDINARY_API_KEY', env.cloudinaryApiKey],
-    ['CLOUDINARY_API_SECRET', env.cloudinaryApiSecret]
+    // ['CLOUDINARY_CLOUD_NAME', env.cloudinaryCloudName],
+    // ['CLOUDINARY_API_KEY', env.cloudinaryApiKey],
+    // ['CLOUDINARY_API_SECRET', env.cloudinaryApiSecret]
   ];
 
   const missing = required.filter(([, value]) => !value).map(([key]) => key);
