@@ -6,9 +6,10 @@ const start = async () => {
   assertProductionEnv();
   await connectDB();
 
-  app.listen(env.port, () => {
-    console.log(`LearnHub AI LMS API running on port ${env.port}`);
-  });
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+});
 };
 
 start().catch((error) => {
