@@ -3,7 +3,7 @@ import { Github, Instagram, Linkedin, Mail } from 'lucide-react';
 import logo from '../../../images/logo.png';
 
 const columns = [
-  { title: 'Platform', links: [['Courses', '/courses'], ['Library', '/library'], ['Student Dashboard', '/dashboard'], ['Admin Dashboard', '/admin']] },
+  { title: 'Platform', links: [['Courses', '/courses'], ['Library', '/library'], ['Student Dashboard', '/dashboard'], ] },
   { title: 'Company', links: [['About', '/about'], ['Contact', '/contact'], ['FAQ', '/faq'], ['Profile', '/profile']] },
   { title: 'LearnHub', links: [['AI Tutor', '/courses'], ['PDF Library', '/library'], ['Payments', '/courses'], ['Analytics', '/admin']] }
 ];
