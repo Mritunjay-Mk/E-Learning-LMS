@@ -151,11 +151,15 @@ const run = async () => {
     WatchHistory.deleteMany()
   ]);
 
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@learnhub.ai';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@12345';
+
   const admin = await User.create({
     name: 'LearnHub Admin',
-    email: 'admin@learnhub.ai',
-    password: 'Admin@12345',
+    email: adminEmail,
+    password: adminPassword,
     role: 'admin',
+    libraryAccess: true,
     headline: 'Platform owner'
   });
 
@@ -182,7 +186,7 @@ const run = async () => {
   await Book.insertMany(books.map((book) => ({ ...book, uploadedBy: admin._id })));
 
   console.log('Seed complete');
-  console.log('Admin: admin@learnhub.ai / Admin@12345');
+  console.log(`Admin: ${adminEmail} / ${process.env.ADMIN_PASSWORD ? '********' : 'Admin@12345'}`);
   console.log('Student: student@learnhub.ai / Student@12345');
   console.log(`Learner id: ${learner._id}`);
 

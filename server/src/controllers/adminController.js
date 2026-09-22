@@ -6,6 +6,7 @@ import Payment from '../models/Payment.js';
 import User from '../models/User.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getPagination } from '../utils/pagination.js';
+import { ApiError } from '../utils/ApiError.js';
 
 export const analytics = asyncHandler(async (_req, res) => {
   const [
@@ -69,6 +70,10 @@ export const listUsers = asyncHandler(async (req, res) => {
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
+  if (req.user?._id?.toString() === req.params.id && req.body.role && req.body.role !== 'admin') {
+    throw new ApiError(400, 'You cannot change your own admin role.');
+  }
+
   const allowed = ['name', 'role', 'libraryAccess', 'educatorSubject'];
   const updates = {};
   allowed.forEach((field) => {
@@ -80,6 +85,9 @@ export const updateUser = asyncHandler(async (req, res) => {
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {
+  if (req.user?._id?.toString() === req.params.id) {
+    throw new ApiError(400, 'You cannot delete your own admin account.');
+  }
   await User.findByIdAndDelete(req.params.id);
   res.json({ success: true });
 });

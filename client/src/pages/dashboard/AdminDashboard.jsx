@@ -7,6 +7,7 @@ import Seo from '../../components/common/Seo';
 import StatCard from '../../components/common/StatCard';
 import { api } from '../../api/client';
 import { money } from '../../utils/format';
+import { useAuthStore } from '../../stores/authStore';
 
 const tabs = [
   ['overview', 'Overview', LayoutDashboard],
@@ -62,6 +63,7 @@ const fetchAdminCourses = async () => {
 };
 
 export default function AdminDashboard() {
+  const currentUser = useAuthStore((state) => state.user);
   const [tab, setTab] = useState('overview');
   const [analytics, setAnalytics] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -517,18 +519,32 @@ export default function AdminDashboard() {
                 <tbody>
                   {users.map((user) => {
                     const assignedCourse = assignedCourseFor(user);
+                    const isSelf = currentUser?._id === user._id || currentUser?.email === user.email;
+                    const isAdmin = user.role === 'admin';
                     return (
                     <tr key={user._id} className="border-t border-white/70">
                       <td className="p-3 font-bold text-ink">
-                        {user.name}
+                        <div className="flex items-center gap-2">
+                          <span>{user.name}</span>
+                          {isSelf && (
+                            <span className="rounded-md bg-brand-100 px-2 py-0.5 text-[11px] font-black text-brand-700">
+                              You
+                            </span>
+                          )}
+                        </div>
                         <span className="block text-xs font-semibold text-muted">{user.email}</span>
                       </td>
                       <td className="p-3">
-                        <select value={user.role} onChange={(event) => updateUser(user._id, { role: event.target.value })} className="rounded-xl bg-white/70 px-3 py-2 font-bold">
-                          <option value="student">student</option>
-                          <option value="educator">educator</option>
-                          <option value="admin">admin</option>
-                        </select>
+                        {isSelf ? (
+                          <span className="inline-flex items-center rounded-xl bg-brand-50 px-3 py-2 text-xs font-black text-brand-700">
+                            admin
+                          </span>
+                        ) : (
+                          <select value={user.role} onChange={(event) => updateUser(user._id, { role: event.target.value })} className="rounded-xl bg-white/70 px-3 py-2 font-bold">
+                            <option value="student">student</option>
+                            <option value="educator">educator</option>
+                          </select>
+                        )}
                       </td>
                       <td className="p-3">
                         {user.role === 'educator' ? (
@@ -545,23 +561,34 @@ export default function AdminDashboard() {
                         )}
                       </td>
                       <td className="p-3">
-                        <select value={user.libraryAccess ? 'enabled' : 'disabled'} onChange={(event) => updateUser(user._id, { libraryAccess: event.target.value === 'enabled' })} className="h-10 rounded-xl bg-white/70 px-3 text-sm font-bold text-slate-700 outline-none">
-                          <option value="enabled">Enabled</option>
-                          <option value="disabled">Disabled</option>
-                        </select>
+                        {isAdmin ? (
+                          <span className="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-700">
+                            Full Access
+                          </span>
+                        ) : (
+                          <select value={user.libraryAccess ? 'enabled' : 'disabled'} onChange={(event) => updateUser(user._id, { libraryAccess: event.target.value === 'enabled' })} className="h-10 rounded-xl bg-white/70 px-3 text-sm font-bold text-slate-700 outline-none">
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                        )}
                       </td>
                       <td className="p-3 text-muted">{new Date(user.createdAt).toLocaleDateString()}</td>
                       <td className="p-3">
-                        <Button
-                          type="button"
-                          variant="danger"
-                          onClick={async () => {
-                            await api.delete(`/admin/users/${user._id}`);
-                            await loadAll();
-                          }}
-                        >
-                          <Trash2 size={17} />
-                        </Button>
+                        {isSelf ? (
+                          <span className="text-xs font-bold text-slate-400">Current User</span>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            onClick={async () => {
+                              if (!window.confirm(`Are you sure you want to delete ${user.name}?`)) return;
+                              await api.delete(`/admin/users/${user._id}`);
+                              await loadAll();
+                            }}
+                          >
+                            <Trash2 size={17} />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                     );
