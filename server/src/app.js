@@ -57,6 +57,20 @@ app.use(mongoSanitize());
 app.use(xssSanitizer);
 app.use(hpp());
 
+// Health check endpoints (placed before rate limiter to prevent uptime monitors from being rate-limited)
+const healthHandler = (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    success: true,
+    message: 'LearnHub AI LMS API is alive and running',
+    service: 'LearnHub AI LMS API',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+};
+
+app.get(['/', '/health', '/api/health'], healthHandler);
+
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
