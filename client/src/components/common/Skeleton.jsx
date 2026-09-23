@@ -4,16 +4,9 @@ export function SkeletonLine({ className = 'h-4 w-full rounded-lg' }) {
 
 export function CourseCardSkeleton() {
   return (
-    <div className="glass rounded-2xl p-3">
-      <SkeletonLine className="h-44 rounded-xl" />
-      <div className="space-y-3 p-2 pt-4">
-        <SkeletonLine className="h-4 w-24 rounded-lg" />
-        <SkeletonLine className="h-6 rounded-lg" />
-        <SkeletonLine className="h-4 w-4/5 rounded-lg" />
-        <SkeletonLine className="h-10 rounded-xl" />
-    <div className="glass w-full max-w-[360px] mx-auto rounded-2xl p-2.5">
+    <div className="glass w-full max-w-[360px] mx-auto rounded-2xl p-3 shadow-sm">
       <SkeletonLine className="aspect-video w-full rounded-xl" />
-      <div className="space-y-2 p-2 pt-3">
+      <div className="space-y-2.5 p-2 pt-3">
         <SkeletonLine className="h-3 w-24 rounded-md" />
         <SkeletonLine className="h-5 rounded-md" />
         <SkeletonLine className="h-3 w-4/5 rounded-md" />
@@ -26,7 +19,7 @@ export function CourseCardSkeleton() {
 export function PageLoader() {
   return (
     <div className="mx-auto grid min-h-[60vh] max-w-7xl place-items-center px-4">
-      <div className="glass w-full max-w-md rounded-2xl p-6">
+      <div className="glass w-full max-w-md rounded-2xl p-6 shadow-sm">
         <SkeletonLine className="h-8 w-2/3 rounded-xl" />
         <div className="mt-5 space-y-3">
           <SkeletonLine />
