@@ -95,6 +95,7 @@ export default function Courses() {
         </GlassCard>
 
         <div className="mt-8 grid gap-6 safe-grid">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {loading
             ? Array.from({ length: 6 }).map((_, index) => <CourseCardSkeleton key={index} />)
             : visibleCourses.map((course) => <CourseCard key={course._id} course={course} />)}

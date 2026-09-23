@@ -39,8 +39,8 @@ export default function Home() {
       <Seo title="Home" description="LearnHub AI LMS is a production-ready MERN learning platform with AI tutor, courses, library, payments, and analytics." />
 
       <section className="relative overflow-hidden px-4 pt-12 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-16 xl:gap-24">
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-xl">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-bold text-brand-700 shadow-sm">
               <Sparkles size={16} />
               AI-powered learning, payments, and library in one LMS
@@ -69,7 +69,7 @@ export default function Home() {
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.12, duration: 0.6 }} className="relative">
+          <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.12, duration: 0.6 }} className="relative w-full max-w-xl lg:ml-auto">
             <GlassCard strong className="overflow-hidden p-4">
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-ink">
                 <img
@@ -91,13 +91,7 @@ export default function Home() {
                 </div>
               </div>
             </GlassCard>
-            <GlassCard className="absolute -bottom-6 -left-4 hidden w-56 p-4 sm:block">
-              <p className="text-sm font-bold text-muted">This week</p>
-              <p className="mt-1 text-3xl font-black text-ink">87%</p>
-              <div className="mt-3 h-2 rounded-full bg-slate-200">
-                <div className="h-full w-[87%] rounded-full brand-gradient" />
-              </div>
-            </GlassCard>
+            
           </motion.div>
         </div>
       </section>
@@ -118,6 +112,7 @@ export default function Home() {
           </Button>
         </div>
         <div className="mt-10 grid gap-6 safe-grid">
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
           {courses.length
             ? courses.map((course) => <CourseCard key={course._id} course={course} />)
             : Array.from({ length: 3 }).map((_, index) => <CourseCardSkeleton key={index} />)}

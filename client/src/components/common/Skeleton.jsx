@@ -11,6 +11,13 @@ export function CourseCardSkeleton() {
         <SkeletonLine className="h-6 rounded-lg" />
         <SkeletonLine className="h-4 w-4/5 rounded-lg" />
         <SkeletonLine className="h-10 rounded-xl" />
+    <div className="glass w-full max-w-[360px] mx-auto rounded-2xl p-2.5">
+      <SkeletonLine className="aspect-video w-full rounded-xl" />
+      <div className="space-y-2 p-2 pt-3">
+        <SkeletonLine className="h-3 w-24 rounded-md" />
+        <SkeletonLine className="h-5 rounded-md" />
+        <SkeletonLine className="h-3 w-4/5 rounded-md" />
+        <SkeletonLine className="h-9 rounded-xl mt-3" />
       </div>
     </div>
   );
