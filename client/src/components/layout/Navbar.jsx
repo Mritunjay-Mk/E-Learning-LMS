@@ -10,7 +10,8 @@ const links = [
   ['Courses', '/courses'],
   ['Library', '/library'],
   ['About', '/about'],
-  ['FAQ', '/faq']
+  ['FAQ', '/faq'],
+  ['Contact', '/contact']
 ];
 
 export default function Navbar() {

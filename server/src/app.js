@@ -17,9 +17,12 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import courseRequestRoutes from './routes/courseRequestRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
+import faqRoutes from './routes/faqRoutes.js';
 import libraryRoutes from './routes/libraryRoutes.js';
 import moduleQuizRoutes from './routes/moduleQuizRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
+import testimonialRoutes from './routes/testimonialRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 
 const app = express();
@@ -102,6 +105,9 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/faqs', faqRoutes);
+app.use('/api/testimonials', testimonialRoutes);
+app.use('/api/public', publicRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

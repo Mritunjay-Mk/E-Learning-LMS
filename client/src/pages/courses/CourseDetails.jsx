@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ReactPlayer from 'react-player/youtube';
-import { Award, BookOpen, CheckCircle2, Clock, Lock, PlayCircle, ShieldCheck, Users, X } from 'lucide-react';
+import {
+  Award,
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Lock,
+  PlayCircle,
+  ShieldCheck,
+  Star,
+  Users,
+  X
+} from 'lucide-react';
+import { api } from '../../api/client';
 import AITutor from '../../components/ai/AITutor';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
@@ -10,158 +23,78 @@ import LazyImage from '../../components/common/LazyImage';
 import RatingStars from '../../components/common/RatingStars';
 import SectionHeading from '../../components/common/SectionHeading';
 import Seo from '../../components/common/Seo';
-import { api } from '../../api/client';
-import { sampleCourses } from '../../data/catalog';
 import { useAuthStore } from '../../stores/authStore';
 import { compactNumber, money } from '../../utils/format';
 import { startPayment } from '../../utils/payment';
-
-const defaultCurriculum = [
-  {
-    title: 'Start here',
-    lessons: [
-      { _id: 'preview-1', title: 'Course overview and roadmap', videoUrl: 'https://www.youtube.com/watch?v=7CqJlxBYj-M', duration: '12 min', isPreview: true },
-      { _id: 'preview-2', title: 'Project setup and workflow', videoUrl: 'https://www.youtube.com/watch?v=mbsmsi7l3r4', duration: '18 min' }
-    ]
-  },
-  {
-    title: 'Build and deploy',
-    lessons: [
-      { _id: 'preview-3', title: 'Payments, progress, and dashboards', videoUrl: 'https://www.youtube.com/watch?v=2HBIzEx6IZA', duration: '20 min' },
-      { _id: 'preview-4', title: 'AI tutor and library systems', videoUrl: 'https://www.youtube.com/watch?v=JMUxmLyrhSk', duration: '16 min' }
-    ]
-  }
-];
-
-const normalizeLookup = (value = '') =>
-  value
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\bor\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-const slugifyTitle = (value = '') =>
-  value
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-const findMatchingCourse = (courses, identifier) => {
-  const requested = normalizeLookup(identifier);
-  return courses.find((item) =>
-    [item._id, item.slug, item.title, slugifyTitle(item.title)].some((value) => normalizeLookup(value || '') === requested)
-  );
-};
-
-const buildGeneratedCourseDetails = (course) => {
-  const title = course.title || 'Course';
-  const category = course.category?.name || course.category || 'Course';
-  const description = course.description || course.subtitle || `A practical ${category} course designed around ${title}.`;
-  const previewVideoUrl = course.previewVideoUrl || course.curriculum?.[0]?.lessons?.[0]?.videoUrl || '';
-
-  return {
-    ...course,
-    subtitle: course.subtitle || `Learn ${title} with a clear, project-first path.`,
-    description,
-    level: course.level || 'Beginner',
-    duration: course.duration || '6 hours',
-    outcomes: course.outcomes?.length
-      ? course.outcomes
-      : [`Understand the core ideas in ${title}`, 'Practice with guided lessons', 'Build confidence with real checkpoints', 'Prepare for the next course in your path'],
-    requirements: course.requirements?.length ? course.requirements : ['Basic computer skills', 'A willingness to practice lesson by lesson'],
-    tags: course.tags?.length ? course.tags : [category, title.split(' ')[0]].filter(Boolean),
-    curriculum: course.curriculum?.length
-      ? course.curriculum
-      : [
-          {
-            title: `Module 1: ${title} foundations`,
-            lessons: [
-              { _id: `${course._id || course.slug || title}-intro`, title: `${title} introduction`, videoUrl: previewVideoUrl, duration: course.duration || '10 min', isPreview: true },
-              { _id: `${course._id || course.slug || title}-practice`, title: `Practice plan for ${title}`, videoUrl: previewVideoUrl, duration: '12 min' },
-              { _id: `${course._id || course.slug || title}-review`, title: `${title} recap and next steps`, videoUrl: previewVideoUrl, duration: '8 min' }
-            ]
-          }
-        ],
-    instructor: course.instructor || {
-      name: 'LearnHub Faculty',
-      title: `${category} mentor`,
-      avatar: '',
-      bio: `Project-based mentor for ${title}.`
-    }
-  };
-};
 
 export default function CourseDetails() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { token } = useAuthStore();
+
   const [course, setCourse] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [hasAccess, setHasAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
-  const [message, setMessage] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
   const [enrollPromptOpen, setEnrollPromptOpen] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
+  // Load course details and student reviews directly from MongoDB
   useEffect(() => {
-    const applyCourse = async (data) => {
-      setCourse(buildGeneratedCourseDetails(data.course));
-      setHasAccess(Boolean(data.hasAccess));
-      const reviewData = await api.get(`/courses/${data.course._id}/reviews`).catch(() => ({ reviews: [] }));
-      setReviews(reviewData.reviews || []);
-    };
+    let active = true;
 
-    const load = async () => {
+    const loadCourse = async () => {
       setLoading(true);
       setNotFound(false);
+
       try {
         const data = await api.get(`/courses/${slug}`);
-        await applyCourse(data);
-      } catch {
-        const courseData = await api.get('/courses?limit=100').catch(() => ({ courses: [] }));
-        const catalogMatch = findMatchingCourse(courseData.courses || [], slug);
-        if (catalogMatch) {
-          try {
-            const data = await api.get(`/courses/${catalogMatch._id}`);
-            await applyCourse(data);
-          } catch {
-            setCourse(buildGeneratedCourseDetails(catalogMatch));
-            setHasAccess(false);
-            setReviews([]);
-          }
-          setLoading(false);
-          return;
-        }
+        if (!active) return;
 
-        const fallback = findMatchingCourse(sampleCourses, slug);
-        if (fallback) {
-          setCourse(buildGeneratedCourseDetails({ ...fallback, curriculum: defaultCurriculum }));
-          setHasAccess(false);
-        } else {
+        setCourse(data.course);
+        setHasAccess(Boolean(data.hasAccess));
+
+        // Load reviews for this course
+        if (data.course?._id) {
+          const reviewData = await api.get(`/courses/${data.course._id}/reviews`).catch(() => ({ reviews: [] }));
+          if (active) setReviews(reviewData.reviews || []);
+        }
+      } catch (err) {
+        if (active) {
           setCourse(null);
           setNotFound(true);
         }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
-    load();
+
+    loadCourse();
+
+    return () => {
+      active = false;
+    };
   }, [slug]);
 
-  const lessons = useMemo(() => course?.curriculum?.flatMap((module) => module.lessons || []) || [], [course]);
-  const preview = course?.previewVideoUrl || lessons[0]?.videoUrl || 'https://www.youtube.com/watch?v=7CqJlxBYj-M';
-  const price = course ? course.discountPrice || course.price : 0;
+  // Aggregate all lessons from curriculum modules
+  const allLessons = useMemo(() => {
+    return course?.curriculum?.flatMap((mod) => mod.lessons || []) || [];
+  }, [course]);
 
-  const buy = async () => {
+  // Fallback video preview
+  const previewVideo = course?.previewVideoUrl || allLessons[0]?.videoUrl || '';
+  const price = course ? (course.discountPrice !== undefined ? course.discountPrice : course.price) : 0;
+
+  // Initiate Razorpay checkout
+  const handleEnroll = async () => {
     if (!token) {
       navigate('/login', { state: { from: `/courses/${slug}` } });
       return;
     }
+
     setPaying(true);
     try {
       await startPayment({ type: 'course', courseId: course._id, navigate });
@@ -172,36 +105,40 @@ export default function CourseDetails() {
     }
   };
 
-  const submitReview = async (event) => {
-    event.preventDefault();
-    setMessage('');
+  // Submit student review to MongoDB
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    setReviewMessage('');
+
     try {
       const data = await api.post(`/courses/${course._id}/reviews`, reviewForm);
-      setReviews((current) => [data.review, ...current.filter((item) => item._id !== data.review._id)]);
+      setReviews((prev) => [data.review, ...prev.filter((r) => r._id !== data.review._id)]);
       setReviewForm({ rating: 5, comment: '' });
-      setMessage('Review saved.');
+      setReviewMessage('Your review has been published. Thank you!');
     } catch (error) {
-      setMessage(error.message);
+      setReviewMessage(error.message || 'Failed to submit review.');
     }
   };
 
   if (loading) {
     return (
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="skeleton h-[520px] rounded-3xl" />
+      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="skeleton h-[480px] rounded-3xl" />
       </section>
     );
   }
 
   if (notFound || !course) {
     return (
-      <section className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <GlassCard className="p-8">
-          <h1 className="text-3xl font-black text-ink">Course not found</h1>
-          <p className="mt-3 text-muted">This course link is not available. Please choose a course from the catalog.</p>
-          <Button to="/courses" className="mt-6">
-            Browse Courses
-          </Button>
+      <section className="mx-auto max-w-3xl px-4 py-20 text-center">
+        <GlassCard className="p-10 shadow-glass">
+          <h1 className="text-3xl font-black text-ink">Course Not Found</h1>
+          <p className="mt-3 text-muted">
+            The course you are looking for might have been moved or unpublished.
+          </p>
+          <div className="mt-6">
+            <Button to="/courses">Browse Catalog</Button>
+          </div>
         </GlassCard>
       </section>
     );
@@ -210,86 +147,156 @@ export default function CourseDetails() {
   return (
     <>
       <Seo title={course.title} description={course.subtitle || course.description} />
+
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+        {/* Top Header Grid */}
+        <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              <Badge>{course.category?.name || 'Course'}</Badge>
-              <Badge tone="green">{course.level}</Badge>
-              {hasAccess && <Badge tone="amber">Enrolled</Badge>}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Badge tone="brand">{course.category?.name || 'Development'}</Badge>
+              <Badge tone="mint">{course.level || 'All Levels'}</Badge>
+              {hasAccess && <Badge tone="amber">Enrolled & Active</Badge>}
             </div>
-            <h1 className="text-4xl font-black leading-tight text-ink sm:text-6xl">{course.title}</h1>
-            <p className="mt-5 text-lg leading-8 text-muted">{course.subtitle || course.description}</p>
-            <div className="mt-6 flex flex-wrap items-center gap-5 text-sm font-bold text-slate-700">
-              <RatingStars rating={course.ratingAverage} count={course.ratingCount} />
-              <span className="inline-flex items-center gap-2">
-                <Users size={18} /> {compactNumber(course.studentsCount || 0)} learners
+
+            <h1 className="text-3xl font-black leading-tight text-ink sm:text-4xl lg:text-5xl">
+              {course.title}
+            </h1>
+
+            <p className="mt-4 text-base leading-relaxed text-muted sm:text-lg">
+              {course.subtitle || course.description}
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-center gap-6 text-sm font-semibold text-slate-700">
+              <RatingStars rating={course.ratingAverage || 4.9} count={course.ratingCount || 12} />
+              <span className="inline-flex items-center gap-2 text-muted">
+                <Users size={17} className="text-slate-500" />
+                {compactNumber(course.studentsCount || 0)} enrolled
               </span>
-              <span className="inline-flex items-center gap-2">
-                <Clock size={18} /> {course.duration}
+              <span className="inline-flex items-center gap-2 text-muted">
+                <Clock size={17} className="text-slate-500" />
+                {course.duration || '12 hours'}
+              </span>
+              <span className="inline-flex items-center gap-2 text-muted">
+                <Globe size={17} className="text-slate-500" />
+                {course.language || 'English'}
               </span>
             </div>
           </div>
 
-          <GlassCard strong className="overflow-hidden p-4">
+          {/* Video Player / Enrollment Card */}
+          <GlassCard strong className="overflow-hidden p-4 shadow-xl">
             {hasAccess ? (
-              <div className="player-frame overflow-hidden rounded-2xl bg-ink">
-                <ReactPlayer url={preview} width="100%" height="320px" controls light={course.coverImage || course.thumbnailUrl} playIcon={<PlayCircle className="text-white drop-shadow-lg" size={70} />} />
+              <div className="aspect-video overflow-hidden rounded-2xl bg-ink">
+                <ReactPlayer
+                  url={previewVideo}
+                  width="100%"
+                  height="100%"
+                  controls
+                  light={course.coverImage || course.thumbnailUrl}
+                  playIcon={<PlayCircle className="text-white drop-shadow-xl" size={68} />}
+                />
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => setEnrollPromptOpen(true)}
-                className="group relative block w-full overflow-hidden rounded-2xl bg-ink text-left focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-                aria-label="Play course video"
+                className="group relative block aspect-video w-full overflow-hidden rounded-2xl bg-ink text-left focus:outline-none"
               >
-                <LazyImage src={course.coverImage || course.thumbnailUrl} alt={course.title} className="h-[320px] w-full opacity-70 transition group-hover:scale-[1.02]" />
-                <span className="absolute inset-0 grid place-items-center bg-slate-950/35">
-                  <span className="grid h-20 w-20 place-items-center rounded-full bg-white/95 text-brand-700 shadow-glow transition group-hover:scale-105">
-                    <PlayCircle size={42} />
+                <LazyImage
+                  src={course.coverImage || course.thumbnailUrl}
+                  alt={course.title}
+                  className="h-full w-full object-cover opacity-75 transition duration-300 group-hover:scale-105"
+                />
+                <span className="absolute inset-0 grid place-items-center bg-black/40">
+                  <span className="grid h-18 w-18 place-items-center rounded-full bg-white/95 text-brand-600 shadow-glow transition group-hover:scale-110">
+                    <PlayCircle size={38} />
                   </span>
                 </span>
-                <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-xl bg-white/95 px-3 py-2 text-xs font-black text-ink">
-                  <Lock size={14} /> Enroll to play
+                <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-xl bg-white/95 px-3 py-1.5 text-xs font-black text-ink shadow-sm">
+                  <Lock size={13} /> Free Preview Available
                 </span>
               </button>
             )}
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-4">
               <div>
-                <p className="text-sm font-semibold text-muted">Course price</p>
-                <p className="text-3xl font-black text-ink">{price === 0 ? 'Free' : money(price)}</p>
+                <p className="text-xs font-bold uppercase tracking-wider text-muted">Tuition Fee</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-black text-ink">
+                    {price === 0 ? 'Free' : money(price)}
+                  </p>
+                  {course.discountPrice && course.price > course.discountPrice && (
+                    <span className="text-sm font-semibold text-muted line-through">
+                      {money(course.price)}
+                    </span>
+                  )}
+                </div>
               </div>
+
               {hasAccess ? (
-                <Button to={`/watch/${course._id || course.slug}`}>
-                  <PlayCircle size={18} /> Watch Course
+                <Button to={`/watch/${course._id || course.slug}`} size="lg">
+                  <PlayCircle size={18} /> Continue Learning
                 </Button>
               ) : (
-                <Button onClick={buy} disabled={paying}>
-                  <ShieldCheck size={18} /> {paying ? 'Opening checkout...' : 'Enroll Now'}
+                <Button onClick={handleEnroll} disabled={paying} size="lg">
+                  <ShieldCheck size={18} />
+                  {paying ? 'Opening Checkout...' : 'Enroll Now'}
                 </Button>
               )}
             </div>
           </GlassCard>
         </div>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_360px]">
+        {/* Content Body & Sidebar */}
+        <div className="mt-14 grid gap-10 lg:grid-cols-[1fr_360px]">
+          {/* Main Content Area */}
           <div className="space-y-8">
-            <GlassCard className="p-6">
-              <SectionHeading eyebrow="Curriculum" title={`${lessons.length} lessons with in-site playback`} />
+            {/* Learning Outcomes */}
+            {course.outcomes?.length > 0 && (
+              <GlassCard className="p-7">
+                <SectionHeading
+                  eyebrow="Competencies"
+                  title="What You Will Master in This Course"
+                />
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {course.outcomes.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-3 rounded-2xl bg-white/60 p-4 text-sm font-semibold text-slate-800"
+                    >
+                      <CheckCircle2 className="shrink-0 text-emerald-600 mt-0.5" size={18} />
+                      <span>{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
+
+            {/* Curriculum Syllabus */}
+            <GlassCard className="p-7">
+              <SectionHeading
+                eyebrow="Syllabus"
+                title={`Curriculum (${allLessons.length} Comprehensive Lessons)`}
+              />
               <div className="mt-6 space-y-4">
-                {(course.curriculum?.length ? course.curriculum : defaultCurriculum).map((module, moduleIndex) => (
-                  <div key={module._id || module.title} className="rounded-2xl bg-white/60 p-4">
-                    <h3 className="font-black text-ink">
-                      {moduleIndex + 1}. {module.title}
+                {course.curriculum?.map((mod, modIdx) => (
+                  <div key={mod._id || modIdx} className="rounded-2xl border border-slate-100 bg-white/70 p-5">
+                    <h3 className="font-black text-ink text-base">
+                      Module {modIdx + 1}: {mod.title}
                     </h3>
-                    <div className="mt-3 grid gap-2">
-                      {module.lessons?.map((lesson, lessonIndex) => (
-                        <div key={lesson._id || lesson.title} className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-4 py-3 text-sm">
-                          <span className="flex items-center gap-3 font-bold text-slate-700">
-                            <PlayCircle size={17} className="text-brand-600" />
+                    <div className="mt-3.5 space-y-2">
+                      {mod.lessons?.map((lesson, lessonIdx) => (
+                        <div
+                          key={lesson._id || lessonIdx}
+                          className="flex items-center justify-between gap-4 rounded-xl bg-slate-50/80 px-4 py-3 text-sm transition hover:bg-slate-50"
+                        >
+                          <span className="flex items-center gap-3 font-semibold text-slate-700">
+                            <PlayCircle size={16} className="text-brand-600" />
                             {lesson.title}
                           </span>
-                          <span className="shrink-0 text-muted">{lesson.duration || `${lessonIndex + 8} min`}</span>
+                          <span className="shrink-0 font-mono text-xs text-muted">
+                            {lesson.duration || '15 min'}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -298,110 +305,174 @@ export default function CourseDetails() {
               </div>
             </GlassCard>
 
-            <GlassCard className="p-6">
-              <SectionHeading eyebrow="Outcomes" title="What you will be able to do" />
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {(course.outcomes?.length ? course.outcomes : ['Build production LMS features', 'Integrate payments', 'Use AI study workflows']).map((item) => (
-                  <div key={item} className="flex gap-3 rounded-xl bg-white/65 p-4 text-sm font-bold text-slate-700">
-                    <CheckCircle2 className="shrink-0 text-emerald-600" size={19} />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </GlassCard>
+            {/* Prerequisites & Requirements */}
+            {course.requirements?.length > 0 && (
+              <GlassCard className="p-7">
+                <SectionHeading eyebrow="Prerequisites" title="Requirements Before Enrolling" />
+                <div className="mt-4 space-y-2.5">
+                  {course.requirements.map((req, i) => (
+                    <div key={i} className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                      <span>{req}</span>
+                    </div>
+                  ))}
+                </div>
+              </GlassCard>
+            )}
 
-            <GlassCard className="p-6">
-              <SectionHeading eyebrow="Reviews" title="Student feedback" />
+            {/* Student Reviews Section */}
+            <GlassCard className="p-7">
+              <SectionHeading eyebrow="Community" title="Student Feedback & Reviews" />
+
+              {/* Review Submission Form for Enrolled Students */}
               {token && hasAccess && (
-                <form onSubmit={submitReview} className="mt-5 grid gap-3 rounded-2xl bg-white/60 p-4">
-                  <select value={reviewForm.rating} onChange={(event) => setReviewForm((value) => ({ ...value, rating: Number(event.target.value) }))} className="h-11 rounded-xl border border-white/80 bg-white/80 px-3 font-semibold">
-                    {[5, 4, 3, 2, 1].map((rating) => (
-                      <option key={rating} value={rating}>
-                        {rating} stars
-                      </option>
-                    ))}
-                  </select>
-                  <textarea value={reviewForm.comment} onChange={(event) => setReviewForm((value) => ({ ...value, comment: event.target.value }))} rows={3} required placeholder="Share your learning experience..." className="rounded-xl border border-white/80 bg-white/80 p-3 outline-none focus:ring-2 focus:ring-brand-500" />
-                  <Button>Submit Review</Button>
-                  {message && <p className="text-sm font-semibold text-muted">{message}</p>}
+                <form onSubmit={handleReviewSubmit} className="mt-6 rounded-2xl bg-white/70 p-5 shadow-sm space-y-3">
+                  <h4 className="font-bold text-ink text-sm">Write a Review</h4>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-muted">Rating:</label>
+                    <select
+                      value={reviewForm.rating}
+                      onChange={(e) => setReviewForm({ ...reviewForm, rating: Number(e.target.value) })}
+                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-sm font-bold"
+                    >
+                      {[5, 4, 3, 2, 1].map((r) => (
+                        <option key={r} value={r}>
+                          {r} Stars
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="Share how this course helped your skills and what you enjoyed most..."
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+
+                  <Button size="sm">Submit Review</Button>
+                  {reviewMessage && <p className="text-xs font-semibold text-brand-700">{reviewMessage}</p>}
                 </form>
               )}
-              <div className="mt-5 grid gap-3">
-                {reviews.length ? (
-                  reviews.map((review) => (
-                    <div key={review._id} className="rounded-2xl bg-white/60 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-black text-ink">{review.user?.name || 'Student'}</p>
-                        <RatingStars rating={review.rating} />
+
+              {/* Reviews List */}
+              <div className="mt-6 space-y-4">
+                {reviews.length > 0 ? (
+                  reviews.map((r) => (
+                    <div key={r._id} className="rounded-2xl bg-white/60 p-4 border border-slate-100">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-black text-ink text-sm">{r.user?.name || 'Verified Learner'}</span>
+                        <div className="flex text-amber-500">
+                          {Array.from({ length: r.rating }).map((_, i) => (
+                            <Star key={i} size={14} fill="currentColor" />
+                          ))}
+                        </div>
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-muted">{review.comment}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-muted">{r.comment}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm font-semibold text-muted">Reviews will appear here once learners complete this course.</p>
+                  <p className="text-sm text-muted">No student reviews yet. Be the first to review after enrolling!</p>
                 )}
               </div>
             </GlassCard>
           </div>
 
+          {/* Sticky Sidebar */}
           <aside className="space-y-6">
-            <GlassCard className="p-5">
-              <h3 className="text-xl font-black text-ink">Instructor</h3>
-              <div className="mt-4 flex items-center gap-3">
-                <LazyImage src={course.instructor?.avatar} alt={course.instructor?.name || 'Instructor'} className="h-14 w-14 rounded-xl" />
+            {/* Instructor Profile Card */}
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-black text-ink">Lead Instructor</h3>
+              <div className="mt-4 flex items-center gap-3.5">
+                {course.instructor?.avatar ? (
+                  <img
+                    src={course.instructor.avatar}
+                    alt={course.instructor.name}
+                    className="h-14 w-14 rounded-2xl object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="brand-gradient grid h-14 w-14 place-items-center rounded-2xl text-xl font-bold text-white shadow-sm">
+                    {(course.instructor?.name || 'L').charAt(0)}
+                  </div>
+                )}
                 <div>
-                  <p className="font-black text-ink">{course.instructor?.name || 'LearnHub Faculty'}</p>
-                  <p className="text-sm font-semibold text-muted">{course.instructor?.title || 'Senior mentor'}</p>
+                  <h4 className="font-black text-ink">{course.instructor?.name || 'LearnHub Faculty'}</h4>
+                  <p className="text-xs font-bold text-brand-600">{course.instructor?.title || 'Principal Mentor'}</p>
                 </div>
               </div>
-              <p className="mt-4 text-sm leading-6 text-muted">{course.instructor?.bio || 'Project-based mentor focused on practical outcomes.'}</p>
+              <p className="mt-4 text-xs leading-relaxed text-muted">
+                {course.instructor?.bio || 'Dedicated to teaching modern engineering and scalable web systems.'}
+              </p>
             </GlassCard>
-            <GlassCard className="p-5">
-              <h3 className="text-xl font-black text-ink">Includes</h3>
-              <div className="mt-4 grid gap-3 text-sm font-bold text-slate-700">
-                <span className="flex items-center gap-2">
-                  <BookOpen size={18} className="text-brand-600" /> Curriculum access
-                </span>
-                <span className="flex items-center gap-2">
-                  <Award size={18} className="text-amber-600" /> Progress tracking
-                </span>
-                <span className="flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-emerald-600" /> Free library access
-                </span>
+
+            {/* Course Features Inclusions Card */}
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-black text-ink">This Program Includes:</h3>
+              <div className="mt-4 space-y-3 text-sm font-semibold text-slate-700">
+                <div className="flex items-center gap-3">
+                  <BookOpen size={17} className="text-brand-600" />
+                  <span>Full lifetime curriculum access</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Award size={17} className="text-amber-600" />
+                  <span>Industry-recognized certificate</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={17} className="text-emerald-600" />
+                  <span>Unlimited PDF library access</span>
+                </div>
               </div>
             </GlassCard>
-            <AITutor courseId={course._id} lessonTitle={course.title} lessonContext={course.description} />
+
+            {/* AI Tutor Assistant Widget */}
+            <AITutor
+              courseId={course._id}
+              lessonTitle={course.title}
+              lessonContext={course.description}
+            />
           </aside>
         </div>
       </section>
 
+      {/* Free Preview / Enrollment Prompt Modal */}
       {enrollPromptOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="enroll-course-title">
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+        >
           <GlassCard strong className="w-full max-w-md p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-100 text-brand-700">
-                <Lock size={24} />
-              </div>
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">
+                <Lock size={22} />
+              </span>
               <button
                 type="button"
                 onClick={() => setEnrollPromptOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-xl bg-white/70 text-slate-700 transition hover:bg-white"
-                aria-label="Close enroll prompt"
+                className="grid h-8 w-8 place-items-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200"
               >
                 <X size={18} />
               </button>
             </div>
-            <h2 id="enroll-course-title" className="mt-5 text-2xl font-black text-ink">Please enroll this course then play</h2>
-            <p className="mt-3 text-sm font-semibold leading-6 text-muted">You can view all course details here. Lesson videos unlock only after enrollment.</p>
+
+            <h3 className="mt-4 text-xl font-black text-ink">Enroll to Unlock Full Masterclass</h3>
+            <p className="mt-2 text-sm text-muted">
+              Enroll today to access all video lessons, project repositories, AI study assistant, and certificate of completion.
+            </p>
+
             <div className="mt-6 flex flex-wrap gap-3">
-              <Button onClick={() => {
-                setEnrollPromptOpen(false);
-                buy();
-              }}>
-                <ShieldCheck size={18} /> Enroll Now
+              <Button
+                onClick={() => {
+                  setEnrollPromptOpen(false);
+                  handleEnroll();
+                }}
+              >
+                <ShieldCheck size={17} /> Enroll for {price === 0 ? 'Free' : money(price)}
               </Button>
-              <Button type="button" variant="secondary" onClick={() => setEnrollPromptOpen(false)}>
-                View Details
+              <Button variant="secondary" onClick={() => setEnrollPromptOpen(false)}>
+                Cancel
               </Button>
             </div>
           </GlassCard>

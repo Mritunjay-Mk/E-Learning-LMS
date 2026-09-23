@@ -1,5 +1,13 @@
-const API_URL =`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api`;
-console.log(import.meta.env.VITE_API_URL);
+const getApiBase = () => {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+  if (!envUrl || envUrl.includes('railway.app') || envUrl.includes('localhost:5000')) {
+    return 'http://localhost:5000/api';
+  }
+  const clean = envUrl.replace(/\/+$/, '');
+  return clean.endsWith('/api') ? clean : `${clean}/api`;
+};
+
+const API_URL = getApiBase();
 
 const getPersistedToken = () => {
   try {
